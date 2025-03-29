@@ -1,0 +1,27 @@
+#!/bin/bash
+
+vm_name="Ubuntu Headless"
+vm_user="vboxuser"
+vm_address="localhost"
+vm_ssh_port="2222"
+vm_ssh_rule_name="guest-ssh"
+
+vm_is_running=$(VBoxManage list runningvms | grep "^\"${vm_name}\"")
+vm_has_rule=$(VBoxManage showvminfo "$vm_name" | grep "NIC 1 Rule" | cut -d'=' -f2 | cut -d',' -f1 | tr -d ' ')
+
+if test ! "$vm_has_rule" = "$vm_ssh_rule_name"; then
+  VBoxManage modifyvm "$vm_name" --nat-pf1 "$vm_ssh_rule_name,tcp,127.0.0.1,$vm_ssh_port,10.0.2.15,22"
+fi
+
+# start vm if it isn't already running
+if test -z "$vm_is_running"; then
+  VBoxManage startvm "$vm_name" --type headless
+  sleep 2
+  while test -z "$(echo -n | nc -q0 $vm_address $vm_ssh_port)"; do
+    echo "Wating another 5s for the vm to wake up..."
+    sleep 5
+  done
+fi
+
+
+ssh ${vm_user}@${vm_address} -p $vm_ssh_port
